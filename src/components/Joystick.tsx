@@ -5,11 +5,20 @@ interface JoystickProps {
   onMove: (vector: Vector2) => void;
   onEnd: () => void;
   autoCenter?: boolean;
+  resetTrigger?: number;
 }
 
-export const Joystick: React.FC<JoystickProps> = ({ onMove, onEnd, autoCenter = true }) => {
+export const Joystick: React.FC<JoystickProps> = ({ onMove, onEnd, autoCenter = true, resetTrigger = 0 }) => {
   const [position, setPosition] = useState<Vector2>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (resetTrigger > 0) {
+      setPosition({ x: 0, y: 0 });
+      onMove({ x: 0, y: 0 });
+      onEnd();
+    }
+  }, [resetTrigger]);
   const containerRef = useRef<HTMLDivElement>(null);
   const joystickSize = 120;
   const knobSize = 50;
@@ -69,7 +78,10 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove, onEnd, autoCenter = 
       ref={containerRef}
       className="relative rounded-full bg-emerald-950/30 border-2 border-emerald-500/20 flex items-center justify-center pointer-events-auto"
       style={{ width: joystickSize, height: joystickSize }}
-      onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
+      onTouchStart={(e) => {
+        e.preventDefault();
+        handleStart(e.touches[0].clientX, e.touches[0].clientY);
+      }}
     >
       <div 
         className="absolute rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 transition-transform duration-75"

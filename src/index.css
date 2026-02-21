@@ -10,6 +10,9 @@
 @layer base {
   body {
     @apply bg-[#0a0a0a] text-white overflow-hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

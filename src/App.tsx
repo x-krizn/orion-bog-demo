@@ -3,9 +3,10 @@ import { GameCanvas } from './components/GameCanvas';
 import { HUD } from './components/HUD';
 import { Joystick } from './components/Joystick';
 import { FireButton } from './components/FireButton';
+import { Radar } from './components/Radar';
 import { GameState, Vector2 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Zap, Target, Play, Info, Settings } from 'lucide-react';
+import { Shield, Zap, Target, Play, Info, Settings, Menu as MenuIcon } from 'lucide-react';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -14,6 +15,8 @@ export default function App() {
   const [moveVector, setMoveVector] = useState<Vector2>({ x: 0, y: 0 });
   const [aimVector, setAimVector] = useState<Vector2>({ x: 0, y: 0 });
   const [isFiring, setIsFiring] = useState(false);
+  const [moveMode, setMoveMode] = useState<'AUTO' | 'MANUAL' | 'SEMI'>('MANUAL');
+  const [resetMoveTrigger, setResetMoveTrigger] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -21,7 +24,14 @@ export default function App() {
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    // ... (Service worker logic remains same)
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -30,10 +40,9 @@ export default function App() {
   };
 
   return (
-    <div className="relative w-screen h-screen bg-[#0a0a0a] overflow-hidden flex items-center justify-center">
+    <div className="relative w-screen h-screen bg-[#0a0a0a] overflow-hidden flex items-center justify-center font-mono">
       <AnimatePresence mode="wait">
         {!gameStarted ? (
-          // ... (Menu content remains same)
           <motion.div 
             key="menu"
             initial={{ opacity: 0 }}
@@ -105,78 +114,190 @@ export default function App() {
             key="game"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="relative w-full h-full"
+            className="w-full h-full flex flex-col lg:block"
           >
-            <GameCanvas 
-              onStateUpdate={setGameState} 
-              moveVector={isMobile ? moveVector : undefined}
-              aimVector={isMobile ? aimVector : undefined}
-              isFiring={isMobile ? isFiring : undefined}
-            />
-            {gameState && <HUD gameState={gameState} />}
-            
-            {/* Action Bar */}
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2 z-30">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="hardware-panel w-12 h-12 flex flex-col items-center justify-center bg-black/40 border-emerald-500/30">
-                  <span className="text-[8px] text-emerald-500/50">{i}</span>
-                  {i === 1 ? <Target className="w-5 h-5 text-emerald-500" /> : <div className="w-5 h-5 border border-dashed border-white/10" />}
+            {isMobile ? (
+              <div className="flex flex-col h-full w-full bg-black relative">
+                {/* Full Screen Viewport Background */}
+                <div className="absolute inset-0 z-0">
+                  <GameCanvas 
+                    onStateUpdate={setGameState} 
+                    moveVector={moveVector}
+                    aimVector={aimVector}
+                    isFiring={isFiring}
+                  />
                 </div>
-              ))}
-            </div>
 
-            {isMobile && (
-              <div className="absolute inset-0 pointer-events-none z-20">
-                <div className="absolute bottom-12 left-12">
-                  <Joystick 
-                    onMove={setMoveVector} 
-                    onEnd={() => {}} // Movement joystick does not re-center
-                    autoCenter={false}
-                  />
-                  <div className="text-[8px] text-emerald-500/50 text-center mt-2 uppercase tracking-widest">Movement</div>
-                </div>
-                <div className="absolute bottom-12 right-12">
-                  <Joystick 
-                    onMove={setAimVector} 
-                    onEnd={() => setAimVector({ x: 0, y: 0 })} 
-                  />
-                  <div className="text-[8px] text-emerald-500/50 text-center mt-2 uppercase tracking-widest">Aiming</div>
-                </div>
-                <div className="absolute bottom-44 right-12">
-                  <FireButton 
-                    onPress={() => setIsFiring(true)} 
-                    onRelease={() => setIsFiring(false)} 
-                  />
+                {/* Overlays */}
+                <div className="relative z-10 flex flex-col h-full pointer-events-none">
+                  {/* Top Row: Status & Radar */}
+                  <div className="flex h-[18%] gap-1 p-1">
+                    <div className="flex-1 hardware-panel border-blue-500/30 overflow-hidden relative bg-black/10 backdrop-blur-[2px] pointer-events-auto">
+                      <div className="absolute top-1 left-2 text-[8px] text-blue-400 uppercase font-bold z-10">Status</div>
+                      {gameState && <HUD gameState={gameState} compact />}
+                    </div>
+                    <div className="flex-1 hardware-panel border-orange-500/30 overflow-hidden relative bg-black/10 backdrop-blur-[2px] pointer-events-auto">
+                      <div className="absolute top-1 left-2 text-[8px] text-orange-400 uppercase font-bold z-10">Radar</div>
+                      {gameState && <Radar gameState={gameState} />}
+                    </div>
+                  </div>
+
+                  {/* Spacer for middle viewport area */}
+                  <div className="flex-grow" />
+
+                  {/* Bottom Controls Area */}
+                  <div className="p-1 space-y-1 pointer-events-auto">
+                    {/* Action Bar */}
+                    <div className="flex justify-center items-center gap-2 mb-1">
+                      {/* Menu Button */}
+                      <button className="hardware-panel w-12 h-12 flex flex-col items-center justify-center bg-black/40 border-emerald-500/30 active:bg-emerald-500/20 transition-colors">
+                        <MenuIcon className="w-5 h-5 text-emerald-500" />
+                        <span className="text-[8px] text-emerald-500/50">MENU</span>
+                      </button>
+
+                      {[1, 2, 3, 4].map(i => (
+                        <div 
+                          key={i} 
+                          className={`hardware-panel w-12 h-12 flex flex-col items-center justify-center bg-black/40 border-emerald-500/30 transition-colors`}
+                        >
+                          <span className="text-[8px] text-emerald-500/50">{i}</span>
+                          <div className="w-5 h-5 border border-dashed border-white/10" />
+                        </div>
+                      ))}
+
+                      {/* Attack Button */}
+                      <div className="relative w-12 h-12">
+                        <FireButton 
+                          onPress={() => setIsFiring(true)} 
+                          onRelease={() => setIsFiring(false)} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex h-32 gap-1">
+                      <div className="flex-1 hardware-panel border-emerald-500/30 flex items-center justify-center relative bg-black/20 backdrop-blur-sm">
+                        <button 
+                          onClick={() => {
+                            const modes: ('AUTO' | 'MANUAL' | 'SEMI')[] = ['AUTO', 'MANUAL', 'SEMI'];
+                            const nextIndex = (modes.indexOf(moveMode) + 1) % modes.length;
+                            setMoveMode(modes[nextIndex]);
+                          }}
+                          className="absolute top-1 left-2 text-[8px] text-emerald-400 uppercase font-bold z-10 hover:bg-emerald-500/20 px-1 rounded transition-colors"
+                        >
+                          {moveMode}
+                        </button>
+                        
+                        {moveMode === 'SEMI' && (
+                          <button 
+                            onClick={() => setResetMoveTrigger(prev => prev + 1)}
+                            className="absolute top-1 right-2 text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-bold z-10 active:bg-emerald-500 active:text-black transition-all"
+                          >
+                            Center
+                          </button>
+                        )}
+
+                        <Joystick 
+                          onMove={setMoveVector} 
+                          onEnd={() => {}} 
+                          autoCenter={moveMode === 'AUTO'}
+                          resetTrigger={resetMoveTrigger}
+                        />
+                      </div>
+                      <div className="flex-1 hardware-panel border-red-500/30 flex items-center justify-center relative bg-black/20 backdrop-blur-sm">
+                        <div className="absolute top-1 left-2 text-[8px] text-red-400 uppercase font-bold z-10">Targeting</div>
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          <Joystick 
+                            onMove={setAimVector} 
+                            onEnd={() => setAimVector({ x: 0, y: 0 })} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {gameState?.isGameOver && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/80 p-4 pointer-events-auto">
+                      <div className="hardware-panel p-6 text-center space-y-4 border-red-500">
+                        <h2 className="text-2xl font-display text-red-500 neon-text">MISSION FAILED</h2>
+                        <p className="text-emerald-400">SCORE: {gameState.score}</p>
+                        <button 
+                          onClick={() => window.location.reload()}
+                          className="hardware-panel px-6 py-2 w-full hover:bg-white/5 transition-all font-display text-sm"
+                        >
+                          RESTART
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-
-            {/* ... (Game over logic remains same) */}
-            {gameState?.isGameOver && (
-              <div className="absolute inset-0 flex items-center justify-center z-50 p-4">
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="hardware-panel p-8 md:p-12 text-center space-y-6 md:space-y-8 w-full max-w-md"
-                >
-                  <h2 className="text-4xl md:text-6xl font-display text-red-500 neon-text">MISSION FAILED</h2>
-                  <div className="space-y-2">
-                    <p className="text-white/40 uppercase tracking-widest text-[10px]">Final Score</p>
-                    <p className="text-3xl md:text-4xl font-display text-emerald-400">{gameState.score}</p>
-                  </div>
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="hardware-panel px-8 py-3 w-full hover:bg-white/5 transition-all font-display"
-                  >
-                    RESTART INITIATIVE
+            ) : (
+              <div className="relative w-full h-full">
+                <GameCanvas 
+                  onStateUpdate={setGameState} 
+                />
+                {gameState && <HUD gameState={gameState} />}
+                
+                {/* Desktop Radar */}
+                <div className="absolute top-8 right-8 w-48 h-48 hardware-panel border-orange-500/30 z-30 hidden lg:block">
+                  <div className="absolute top-1 left-2 text-[8px] text-orange-400 uppercase font-bold">Radar</div>
+                  {gameState && <Radar gameState={gameState} />}
+                </div>
+                
+                {/* Action Bar */}
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
+                  {/* Menu Button */}
+                  <button className="hardware-panel w-12 h-12 flex flex-col items-center justify-center bg-black/40 border-emerald-500/30 active:bg-emerald-500/20 transition-colors">
+                    <MenuIcon className="w-5 h-5 text-emerald-500" />
+                    <span className="text-[8px] text-emerald-500/50">MENU</span>
                   </button>
-                </motion.div>
+
+                  {[1, 2, 3, 4].map(i => (
+                    <div 
+                      key={i} 
+                      className={`hardware-panel w-12 h-12 flex flex-col items-center justify-center bg-black/40 border-emerald-500/30 transition-colors`}
+                    >
+                      <span className="text-[8px] text-emerald-500/50">{i}</span>
+                      <div className="w-5 h-5 border border-dashed border-white/10" />
+                    </div>
+                  ))}
+
+                  {/* Attack Button */}
+                  <div className="relative w-12 h-12">
+                    <FireButton 
+                      onPress={() => setIsFiring(true)} 
+                      onRelease={() => setIsFiring(false)} 
+                    />
+                  </div>
+                </div>
+
+                {gameState?.isGameOver && (
+                  <div className="absolute inset-0 flex items-center justify-center z-50 p-4">
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="hardware-panel p-8 md:p-12 text-center space-y-6 md:space-y-8 w-full max-w-md"
+                    >
+                      <h2 className="text-4xl md:text-6xl font-display text-red-500 neon-text">MISSION FAILED</h2>
+                      <div className="space-y-2">
+                        <p className="text-white/40 uppercase tracking-widest text-[10px]">Final Score</p>
+                        <p className="text-3xl md:text-4xl font-display text-emerald-400">{gameState.score}</p>
+                      </div>
+                      <button 
+                        onClick={() => window.location.reload()}
+                        className="hardware-panel px-8 py-3 w-full hover:bg-white/5 transition-all font-display"
+                      >
+                        RESTART INITIATIVE
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-      {/* ... (Background Ambience remains same) */}
+      
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,0,0.05)_0%,transparent_70%)]" />
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")' }} />
