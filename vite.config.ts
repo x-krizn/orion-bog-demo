@@ -1,17 +1,10 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
-
 export default defineConfig({
+  base: "/orion-bog-demo/",
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [
-        "favicon.ico",
-        "icon-192.png",
-        "icon-512.png"
-      ],
+      includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "Project Orion",
         short_name: "Orion",
@@ -19,7 +12,7 @@ export default defineConfig({
         theme_color: "#00ff00",
         background_color: "#0a0a0a",
         display: "standalone",
-        start_url: "/",
+        start_url: "/orion-bog-demo/",
         icons: [
           {
             src: "icon-192.png",
@@ -34,15 +27,11 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
-        navigateFallback: "/index.html"
+        navigateFallback: "/orion-bog-demo/index.html"
       },
       devOptions: {
         enabled: true
       }
     })
-  ],
-  build: {
-    sourcemap: false
-  }
+  ]
 });
